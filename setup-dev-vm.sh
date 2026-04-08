@@ -141,14 +141,14 @@ else
 
 Host $VM_SLUG
   HostName $VM_HOST
-  User root
+  User node
 EOF
     ok "Added to ~/.ssh/config — use 'Cmd+Shift+P → Remote-SSH → $VM_SLUG' in VS Code"
   else
     warn "Skipped — add manually:"
     echo "  Host $VM_SLUG"
     echo "    HostName $VM_HOST"
-    echo "    User root"
+    echo "    User node"
   fi
 fi
 echo ""

@@ -116,5 +116,66 @@ else
   echo "Session sync: pm2 cron already configured"
 fi
 
+# 11. Provision non-root user (node) for Claude Code yolo mode
+# Claude Code refuses --dangerously-skip-permissions as root
+echo "--- Non-root user (node) ---"
+NODE_HOME="/home/node"
+if id node &>/dev/null; then
+  echo "node user exists"
+else
+  useradd -m -s "$(which zsh)" node
+  echo "node user created"
+fi
+
+# Ensure zsh is default shell
+chsh -s "$(which zsh)" node 2>/dev/null || true
+
+# Copy dotfile repo
+if [ ! -d "$NODE_HOME/dotfile" ]; then
+  cp -r "$DOTFILE_DIR" "$NODE_HOME/dotfile"
+fi
+
+# Shell configs — source dotfile .zshrc
+cat > "$NODE_HOME/.zshrc" << 'ZSH'
+[ -f ~/dotfile/.zshrc ] && source ~/dotfile/.zshrc
+ZSH
+
+# Also source from .bashrc as fallback
+if ! grep -q "dotfile/.zshrc" "$NODE_HOME/.bashrc" 2>/dev/null; then
+  cat >> "$NODE_HOME/.bashrc" << 'BASH'
+
+# Source dotfile config
+[ -f ~/dotfile/.zshrc ] && source ~/dotfile/.zshrc
+BASH
+fi
+
+# Symlink dotfiles
+ln -sf "$NODE_HOME/dotfile/.gitconfig" "$NODE_HOME/.gitconfig"
+ln -sf "$NODE_HOME/dotfile/.npmrc" "$NODE_HOME/.npmrc"
+
+# Claude Code settings
+mkdir -p "$NODE_HOME/.claude"
+if [ ! -f "$NODE_HOME/.claude/settings.json" ]; then
+  cp ~/.claude/settings.json "$NODE_HOME/.claude/settings.json" 2>/dev/null || true
+  echo "Claude Code: copied settings to node user"
+fi
+
+# Copy SSH keys from root so gh/git work
+mkdir -p "$NODE_HOME/.ssh"
+if [ -f ~/.ssh/id_ed25519 ]; then
+  cp ~/.ssh/id_ed25519 "$NODE_HOME/.ssh/"
+  cp ~/.ssh/id_ed25519.pub "$NODE_HOME/.ssh/" 2>/dev/null || true
+  chmod 600 "$NODE_HOME/.ssh/id_ed25519"
+fi
+cp ~/.ssh/known_hosts "$NODE_HOME/.ssh/" 2>/dev/null || true
+
+# Copy git credentials
+cp ~/.git-credentials "$NODE_HOME/.git-credentials" 2>/dev/null || true
+
+# Fix ownership
+chown -R node:node "$NODE_HOME"
+
+echo "node user provisioned — use 'ssh -l node' for Claude Code yolo mode"
+
 echo ""
 echo "=== Install complete ==="
