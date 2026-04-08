@@ -9,6 +9,11 @@ export PATH="$PNPM_HOME:$PATH"
 # --- fnm (node version manager) ---
 eval "$(fnm env --use-on-cd 2>/dev/null)" || true
 
+# --- Auto-switch to node user on exe.dev VMs (sshd forces root) ---
+if [ "$(whoami)" = "root" ] && [ -d /exe.dev ] && [ -n "$SSH_CONNECTION" ] && [[ $- == *i* ]]; then
+  exec su - node
+fi
+
 # --- Aliases ---
 alias yolo="CLAUDE_CODE_NO_FLICKER=1 claude --dangerously-skip-permissions"
 alias ll='ls -la'
