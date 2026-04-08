@@ -125,6 +125,10 @@ else
   echo "dev user created"
 fi
 
+# Allow dev user to auto-update Claude Code (installed globally as root)
+chown -R dev:dev /usr/local/lib/node_modules/@anthropic-ai/ 2>/dev/null || true
+chown dev:dev /usr/local/bin/claude 2>/dev/null || true
+
 # Copy dotfile repo
 if [ ! -d "$DEV_HOME/dotfile" ]; then
   cp -r "$DOTFILE_DIR" "$DEV_HOME/dotfile"
