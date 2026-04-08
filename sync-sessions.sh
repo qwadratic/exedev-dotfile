@@ -10,7 +10,7 @@ set -euo pipefail
 
 SESSIONS_DIR="$HOME/.claude/projects"
 REPO_DIR="$HOME/claude-sessions"
-VM_NAME=$(hostname 2>/dev/null || echo "unknown")
+VM_NAME=${SYNC_HOSTNAME:-$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo "unknown")}
 
 if [ ! -d "$SESSIONS_DIR" ]; then
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) No sessions directory, skipping"
@@ -31,6 +31,9 @@ rsync -a --include='*/' --include='*.jsonl' --include='*.md' --exclude='*' \
   "$SESSIONS_DIR/" "$TARGET/"
 
 cd "$REPO_DIR"
+
+# Pull latest from other machines
+git pull --rebase --quiet origin main 2>/dev/null || true
 
 # Check if anything changed
 if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
