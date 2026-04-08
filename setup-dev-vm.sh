@@ -55,12 +55,12 @@ echo ""
 # --- Step 4: Copy dotfiles + run install ---
 warn "Copying dotfiles to VM..."
 scp -q "$DOTFILE_DIR/install.sh" \
-       "$DOTFILE_DIR/.zshrc" \
+       "$DOTFILE_DIR/.bashrc" \
        "$DOTFILE_DIR/.gitconfig" \
        "$DOTFILE_DIR/.npmrc" \
        "$DOTFILE_DIR/.node-version" \
        "$VM_HOST:/tmp/"
-ssh "$VM_HOST" "mkdir -p ~/dotfile && cp /tmp/{install.sh,.zshrc,.gitconfig,.npmrc,.node-version} ~/dotfile/ && chmod +x ~/dotfile/install.sh"
+ssh "$VM_HOST" "mkdir -p ~/dotfile && cp /tmp/{install.sh,.bashrc,.gitconfig,.npmrc,.node-version} ~/dotfile/ && chmod +x ~/dotfile/install.sh"
 ok "Dotfiles copied"
 echo ""
 

@@ -12,7 +12,7 @@ echo "=== Dev VM Bootstrap ==="
 # 1. System packages
 echo "--- System packages ---"
 apt-get update -qq
-apt-get install -y -qq zsh git curl jq rsync 2>/dev/null
+apt-get install -y -qq git curl jq rsync 2>/dev/null
 
 # 2. corepack + pnpm (node already present on node:22 image)
 echo "--- corepack + pnpm ---"
@@ -70,13 +70,10 @@ echo "--- Dotfiles ---"
 ln -sf "$DOTFILE_DIR/.gitconfig" ~/.gitconfig
 ln -sf "$DOTFILE_DIR/.npmrc" ~/.npmrc
 
-# Set up .zshrc to source dotfile version
-cat > ~/.zshrc << 'ZSH'
-[ -f ~/dotfile/.zshrc ] && source ~/dotfile/.zshrc
-ZSH
-
-# Set default shell to zsh
-chsh -s "$(which zsh)" 2>/dev/null || true
+# Source dotfile .bashrc
+if ! grep -q "dotfile/.bashrc" ~/.bashrc 2>/dev/null; then
+  echo '[ -f ~/dotfile/.bashrc ] && source ~/dotfile/.bashrc' >> ~/.bashrc
+fi
 
 # 9. Claude Code settings — disable noisy MCPs
 echo "--- Claude Code config ---"
@@ -123,30 +120,18 @@ NODE_HOME="/home/node"
 if id node &>/dev/null; then
   echo "node user exists"
 else
-  useradd -m -s "$(which zsh)" node
+  useradd -m -s /bin/bash node
   echo "node user created"
 fi
-
-# Ensure zsh is default shell
-chsh -s "$(which zsh)" node 2>/dev/null || true
 
 # Copy dotfile repo
 if [ ! -d "$NODE_HOME/dotfile" ]; then
   cp -r "$DOTFILE_DIR" "$NODE_HOME/dotfile"
 fi
 
-# Shell configs — source dotfile .zshrc
-cat > "$NODE_HOME/.zshrc" << 'ZSH'
-[ -f ~/dotfile/.zshrc ] && source ~/dotfile/.zshrc
-ZSH
-
-# Also source from .bashrc as fallback
-if ! grep -q "dotfile/.zshrc" "$NODE_HOME/.bashrc" 2>/dev/null; then
-  cat >> "$NODE_HOME/.bashrc" << 'BASH'
-
-# Source dotfile config
-[ -f ~/dotfile/.zshrc ] && source ~/dotfile/.zshrc
-BASH
+# Source dotfile .bashrc
+if ! grep -q "dotfile/.bashrc" "$NODE_HOME/.bashrc" 2>/dev/null; then
+  echo '[ -f ~/dotfile/.bashrc ] && source ~/dotfile/.bashrc' >> "$NODE_HOME/.bashrc"
 fi
 
 # Symlink dotfiles
