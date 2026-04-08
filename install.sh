@@ -12,7 +12,7 @@ echo "=== Dev VM Bootstrap ==="
 # 1. System packages
 echo "--- System packages ---"
 apt-get update -qq
-apt-get install -y -qq zsh git curl jq 2>/dev/null
+apt-get install -y -qq zsh git curl jq rsync 2>/dev/null
 
 # 2. corepack + pnpm (node already present on node:22 image)
 echo "--- corepack + pnpm ---"
@@ -107,12 +107,13 @@ if [ ! -d ~/claude-sessions ]; then
   git clone git@github.com:qwadratic/claude-sessions.git ~/claude-sessions 2>/dev/null || \
     echo "Could not clone claude-sessions — set up SSH key for GitHub first"
 fi
-# Add cron job if not already present
-if ! crontab -l 2>/dev/null | grep -q "sync-sessions"; then
-  (crontab -l 2>/dev/null; echo "0 */4 * * * $DOTFILE_DIR/sync-sessions.sh >> /tmp/sync-sessions.log 2>&1") | crontab -
-  echo "Session sync: cron installed (every 4 hours)"
+# Schedule via pm2 cron (no crontab on exe.dev VMs)
+if ! pm2 list 2>/dev/null | grep -q "session-sync"; then
+  pm2 start "$DOTFILE_DIR/sync-sessions.sh" --name session-sync --cron-restart="0 */4 * * *" --no-autorestart --interpreter bash 2>/dev/null
+  pm2 save 2>/dev/null
+  echo "Session sync: pm2 cron installed (every 4 hours)"
 else
-  echo "Session sync: cron already configured"
+  echo "Session sync: pm2 cron already configured"
 fi
 
 echo ""
