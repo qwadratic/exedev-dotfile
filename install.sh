@@ -89,8 +89,10 @@ if [ ! -f ~/.claude/settings.json ]; then
     "claude-ai-Google Calendar",
     "claude-ai-Google Drive",
     "claude-ai-Notion",
-    "claude-ai-Slack"
-  ]
+    "claude-ai-Slack",
+    "claude-ai-mini-me"
+  ],
+  "skipDangerousModePermissionPrompt": true
 }
 SETTINGS
   echo "Claude Code: disabled noisy MCPs"
