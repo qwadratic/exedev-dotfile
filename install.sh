@@ -113,54 +113,59 @@ else
   echo "Session sync: pm2 cron already configured"
 fi
 
-# 11. Provision non-root user (node) for Claude Code yolo mode
+# 11. Provision non-root user (dev) for Claude Code yolo mode
 # Claude Code refuses --dangerously-skip-permissions as root
-echo "--- Non-root user (node) ---"
-NODE_HOME="/home/node"
-if id node &>/dev/null; then
-  echo "node user exists"
+echo "--- Non-root user (dev) ---"
+DEV_HOME="/home/dev"
+if id dev &>/dev/null; then
+  echo "dev user exists"
 else
-  useradd -m -s /bin/bash node
-  echo "node user created"
+  useradd -m -s /bin/bash dev
+  echo "dev user created"
 fi
 
 # Copy dotfile repo
-if [ ! -d "$NODE_HOME/dotfile" ]; then
-  cp -r "$DOTFILE_DIR" "$NODE_HOME/dotfile"
+if [ ! -d "$DEV_HOME/dotfile" ]; then
+  cp -r "$DOTFILE_DIR" "$DEV_HOME/dotfile"
 fi
 
 # Source dotfile .bashrc
-if ! grep -q "dotfile/.bashrc" "$NODE_HOME/.bashrc" 2>/dev/null; then
-  echo '[ -f ~/dotfile/.bashrc ] && source ~/dotfile/.bashrc' >> "$NODE_HOME/.bashrc"
+if ! grep -q "dotfile/.bashrc" "$DEV_HOME/.bashrc" 2>/dev/null; then
+  echo '[ -f ~/dotfile/.bashrc ] && source ~/dotfile/.bashrc' >> "$DEV_HOME/.bashrc"
 fi
 
 # Symlink dotfiles
-ln -sf "$NODE_HOME/dotfile/.gitconfig" "$NODE_HOME/.gitconfig"
-ln -sf "$NODE_HOME/dotfile/.npmrc" "$NODE_HOME/.npmrc"
+ln -sf "$DEV_HOME/dotfile/.gitconfig" "$DEV_HOME/.gitconfig"
+ln -sf "$DEV_HOME/dotfile/.npmrc" "$DEV_HOME/.npmrc"
 
 # Claude Code settings
-mkdir -p "$NODE_HOME/.claude"
-if [ ! -f "$NODE_HOME/.claude/settings.json" ]; then
-  cp ~/.claude/settings.json "$NODE_HOME/.claude/settings.json" 2>/dev/null || true
-  echo "Claude Code: copied settings to node user"
+mkdir -p "$DEV_HOME/.claude"
+if [ ! -f "$DEV_HOME/.claude/settings.json" ]; then
+  cp ~/.claude/settings.json "$DEV_HOME/.claude/settings.json" 2>/dev/null || true
+  echo "Claude Code: copied settings to dev user"
 fi
 
 # Copy SSH keys from root so gh/git work
-mkdir -p "$NODE_HOME/.ssh"
+mkdir -p "$DEV_HOME/.ssh"
 if [ -f ~/.ssh/id_ed25519 ]; then
-  cp ~/.ssh/id_ed25519 "$NODE_HOME/.ssh/"
-  cp ~/.ssh/id_ed25519.pub "$NODE_HOME/.ssh/" 2>/dev/null || true
-  chmod 600 "$NODE_HOME/.ssh/id_ed25519"
+  cp ~/.ssh/id_ed25519 "$DEV_HOME/.ssh/"
+  cp ~/.ssh/id_ed25519.pub "$DEV_HOME/.ssh/" 2>/dev/null || true
+  chmod 600 "$DEV_HOME/.ssh/id_ed25519"
 fi
-cp ~/.ssh/known_hosts "$NODE_HOME/.ssh/" 2>/dev/null || true
+cp ~/.ssh/known_hosts "$DEV_HOME/.ssh/" 2>/dev/null || true
 
 # Copy git credentials
-cp ~/.git-credentials "$NODE_HOME/.git-credentials" 2>/dev/null || true
+cp ~/.git-credentials "$DEV_HOME/.git-credentials" 2>/dev/null || true
 
 # Fix ownership
-chown -R node:node "$NODE_HOME"
+chown -R dev:dev "$DEV_HOME"
 
-echo "node user provisioned — use 'ssh -l node' for Claude Code yolo mode"
+# Auto-switch root to dev user on interactive SSH
+if ! grep -q "exec su - dev" ~/.profile 2>/dev/null; then
+  sed -i '1a\# Auto-switch to dev user (Claude Code needs non-root for yolo mode)\nif [ "$(whoami)" = "root" ] \&\& [ -d /exe.dev ] \&\& [ -n "$SSH_CONNECTION" ] \&\& [ -t 0 ]; then exec su - dev; fi\n' ~/.profile
+fi
+
+echo "dev user provisioned"
 
 echo ""
 echo "=== Install complete ==="
