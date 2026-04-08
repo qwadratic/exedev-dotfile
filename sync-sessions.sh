@@ -1,34 +1,40 @@
 #!/bin/bash
-# Syncs Claude Code sessions to a private git repo.
-# Runs via cron on the VM. Pushes new/changed session files.
+# Syncs Claude Code sessions + gstack data to a private git repo.
+# Runs via cron/pm2. Pushes new/changed files every 4 hours.
 #
-# Setup (once per VM):
+# Setup (once per machine):
 #   git clone git@github.com:qwadratic/claude-sessions.git ~/claude-sessions
-#   crontab -e → add: 0 */4 * * * ~/dotfile/sync-sessions.sh >> /tmp/sync-sessions.log 2>&1
 
 set -euo pipefail
 
 SESSIONS_DIR="$HOME/.claude/projects"
+GSTACK_DIR="$HOME/.gstack"
 REPO_DIR="$HOME/claude-sessions"
 VM_NAME=${SYNC_HOSTNAME:-$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo "unknown")}
-
-if [ ! -d "$SESSIONS_DIR" ]; then
-  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) No sessions directory, skipping"
-  exit 0
-fi
 
 if [ ! -d "$REPO_DIR/.git" ]; then
   echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) Sessions repo not cloned at $REPO_DIR, skipping"
   exit 1
 fi
 
-# Sync sessions into a VM-specific subdirectory
 TARGET="$REPO_DIR/$VM_NAME"
 mkdir -p "$TARGET"
 
-# rsync sessions (only .jsonl and memory files, skip node_modules-like junk)
-rsync -a --include='*/' --include='*.jsonl' --include='*.md' --exclude='*' \
-  "$SESSIONS_DIR/" "$TARGET/"
+# Sync Claude Code sessions (.jsonl + memory .md files)
+if [ -d "$SESSIONS_DIR" ]; then
+  rsync -a --include='*/' --include='*.jsonl' --include='*.md' --exclude='*' \
+    "$SESSIONS_DIR/" "$TARGET/claude-sessions/"
+fi
+
+# Sync gstack data (projects, analytics, config — skip browser profiles)
+if [ -d "$GSTACK_DIR" ]; then
+  rsync -a \
+    --exclude='chromium-profile/' \
+    --exclude='cdp-profile/' \
+    --exclude='worktrees/' \
+    --exclude='sessions/' \
+    "$GSTACK_DIR/" "$TARGET/gstack/"
+fi
 
 cd "$REPO_DIR"
 
