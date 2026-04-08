@@ -101,5 +101,19 @@ else
   echo "Claude Code: settings.json already exists, skipping"
 fi
 
+# 10. Session sync — clone repo + set up cron
+echo "--- Session sync ---"
+if [ ! -d ~/claude-sessions ]; then
+  git clone git@github.com:qwadratic/claude-sessions.git ~/claude-sessions 2>/dev/null || \
+    echo "Could not clone claude-sessions — set up SSH key for GitHub first"
+fi
+# Add cron job if not already present
+if ! crontab -l 2>/dev/null | grep -q "sync-sessions"; then
+  (crontab -l 2>/dev/null; echo "0 */4 * * * $DOTFILE_DIR/sync-sessions.sh >> /tmp/sync-sessions.log 2>&1") | crontab -
+  echo "Session sync: cron installed (every 4 hours)"
+else
+  echo "Session sync: cron already configured"
+fi
+
 echo ""
 echo "=== Install complete ==="
