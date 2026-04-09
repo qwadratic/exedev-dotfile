@@ -133,6 +133,13 @@ else
   echo "Claude Code: settings.json already exists, skipping"
 fi
 
+echo "--- GSD skill ---"
+if [ ! -d ~/.claude/get-shit-done ]; then
+  npx get-shit-done-cc 2>/dev/null || echo "GSD install failed — run 'npx get-shit-done-cc' manually"
+else
+  echo "GSD: already installed"
+fi
+
 echo "--- Session sync ---"
 if [ ! -d ~/claude-sessions ]; then
   git clone git@github.com:qwadratic/claude-sessions.git ~/claude-sessions 2>/dev/null || \
