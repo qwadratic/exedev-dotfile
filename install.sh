@@ -141,10 +141,7 @@ else
 fi
 
 echo "--- Session sync ---"
-if [ ! -d ~/claude-sessions ]; then
-  git clone git@github.com:qwadratic/claude-sessions.git ~/claude-sessions 2>/dev/null || \
-    echo "Could not clone claude-sessions — set up SSH key for GitHub first"
-fi
+# No clone needed — sync-sessions.sh auto-initializes with push-only approach
 if ! pm2 list 2>/dev/null | grep -q "session-sync"; then
   pm2 start ~/dotfile/sync-sessions.sh --name session-sync --cron-restart="0 */4 * * *" --no-autorestart --interpreter bash 2>/dev/null || true
   pm2 save 2>/dev/null || true
