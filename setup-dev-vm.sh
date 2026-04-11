@@ -70,22 +70,30 @@ echo ""
 ok "Tools installed"
 echo ""
 
-# --- Step 5: gh auth ---
-echo "--- GitHub CLI auth ---"
-ask "Run 'gh auth login' on the VM now? [Y/n]: "
-if [[ ! "$REPLY" =~ ^[Nn] ]]; then
-  echo "Opening interactive SSH session for gh auth..."
-  echo "(Complete the device flow, then type 'exit' to continue)"
-  ssh -t "$VM_HOST" "gh auth login"
-  # Verify
-  if ssh "$VM_HOST" "gh auth status" 2>/dev/null; then
-    ok "GitHub authenticated"
-  else
-    warn "gh auth may not have completed — you can run 'ssh $VM_HOST gh auth login' later"
-  fi
+# --- Step 4.5: Cross-VM SSH (dev → staging/twin/any app VM) ---
+echo "--- Cross-VM SSH access ---"
+warn "Generating SSH keypair on $VM_SLUG..."
+ssh "$VM_HOST" "mkdir -p ~/.ssh && chmod 700 ~/.ssh && test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519 -C '${VM_SLUG}@exe' >/dev/null"
+PUBKEY=$(ssh "$VM_HOST" "cat ~/.ssh/id_ed25519.pub")
+ok "Keypair ready"
+
+warn "Registering key with your exe.dev account..."
+if ssh exe.dev whoami 2>/dev/null | grep -q "${VM_SLUG}@exe"; then
+  ok "Key already registered on exe.dev account"
 else
-  warn "Skipped — run 'ssh $VM_HOST gh auth login' later"
+  echo "$PUBKEY" | ssh exe.dev ssh-key add 2>&1 | tail -3
+  ok "Key registered"
 fi
+
+warn "Writing ~/.ssh/config on VM (User=$USER for *.exe.xyz)..."
+ssh "$VM_HOST" "cat > ~/.ssh/config <<CFG
+Host *.exe.xyz
+  User $USER
+  IdentityFile ~/.ssh/id_ed25519
+  StrictHostKeyChecking accept-new
+CFG
+chmod 600 ~/.ssh/config"
+ok "SSH config written — $VM_SLUG can now SSH any exe.dev VM in your account"
 echo ""
 
 # --- Step 6: Claude Code login ---
@@ -167,7 +175,6 @@ echo "pm2:      $(pm2 --version 2>/dev/null || echo 'not found')"
 echo "zsh:      $(zsh --version 2>/dev/null)"
 echo "Disk:     $(df -h / | tail -1 | awk '{print $4 " free"}')"
 echo ""
-echo "gh auth:     $(gh auth status 2>&1 | head -1 || echo 'not logged in')"
 echo "claude auth: $([ -f ~/.claude/.credentials.json ] && echo 'configured' || echo 'not configured')"
 echo "gsd:         $([ -d ~/.claude/skills ] && ls ~/.claude/skills/ 2>/dev/null | head -5 || echo 'no skills')"
 echo "gstack:      $([ -d ~/.claude/skills/gstack ] && echo 'installed' || echo 'not installed')"
