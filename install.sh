@@ -7,8 +7,9 @@ set -euo pipefail
 #
 # Strategy:
 #   Phase 1 (root): apt packages, create dev user, install global binaries
+#                    (pi coding agent + pix-optimizer, no Claude Code)
 #   Phase 2 (root): give dev user ownership of global tools, set up auto-switch
-#   Phase 3 (dev):  dotfiles, claude settings, session sync, pm2
+#   Phase 3 (dev):  dotfiles, pi extensions, optimizer config, session sync, pm2
 
 DOTFILE_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEV_HOME="/home/dev"
@@ -44,11 +45,11 @@ if ! command -v gh &>/dev/null; then
 fi
 echo "gh: $(gh --version | head -1)"
 
-echo "--- Claude Code ---"
-if ! command -v claude &>/dev/null; then
-  npm install -g @anthropic-ai/claude-code
+echo "--- Pi Coding Agent ---"
+if ! command -v pi &>/dev/null; then
+  npm install -g @earendil-works/pi-coding-agent
 fi
-echo "claude: $(claude --version 2>/dev/null || echo 'installed')"
+echo "pi: $(pi --version 2>/dev/null || echo 'installed')"
 
 echo "--- Supabase CLI ---"
 if ! command -v supabase &>/dev/null; then
@@ -81,11 +82,11 @@ echo "pm2: $(pm2 --version 2>/dev/null)"
 echo "--- Permissions ---"
 # Give dev user ownership of npm globals so auto-updates work
 chown -R dev:dev /usr/local/lib/node_modules/ 2>/dev/null || true
-chown dev:dev /usr/local/bin/claude /usr/local/bin/vercel /usr/local/bin/pm2 2>/dev/null || true
+chown dev:dev /usr/local/bin/pi /usr/local/bin/vercel /usr/local/bin/pm2 2>/dev/null || true
 
 # Auto-switch root → dev on interactive SSH (exe.dev sshd forces root)
 if ! grep -q "exec su - dev" ~/.profile 2>/dev/null; then
-  sed -i '1a\# Auto-switch to dev user (Claude Code needs non-root for yolo mode)\nif [ "$(whoami)" = "root" ] \&\& [ -d /exe.dev ] \&\& [ -n "$SSH_CONNECTION" ] \&\& [ -t 0 ]; then exec su - dev; fi\n' ~/.profile
+  sed -i '1a\# Auto-switch to dev user (npm globals + pi coding agent expect non-root)\nif [ "$(whoami)" = "root" ] \&\& [ -d /exe.dev ] \&\& [ -n "$SSH_CONNECTION" ] \&\& [ -t 0 ]; then exec su - dev; fi\n' ~/.profile
 fi
 # Also cover zsh (exe.dev may set it as default shell)
 if ! grep -q "exec su - dev" ~/.zshrc 2>/dev/null; then
@@ -120,24 +121,28 @@ echo "--- Switching to dev user ---"
 su - dev << 'DEVSETUP'
 set -eo pipefail
 
-echo "--- Claude Code config ---"
-mkdir -p ~/.claude
-if [ ! -f ~/.claude/settings.json ]; then
-  cat > ~/.claude/settings.json << 'SETTINGS'
-{
-  "skipDangerousModePermissionPrompt": true
-}
-SETTINGS
-  echo "Claude Code: settings configured"
-else
-  echo "Claude Code: settings.json already exists, skipping"
-fi
+echo "--- Pi extensions (pix-optimizer) ---"
+# `pi install` handles the npm-add + registration in ~/.pi/agent/settings.json.
+# Safe to re-run (idempotent).
+pi install npm:@xynogen/pix-optimizer 2>&1 | tail -3 || \
+  echo "pix-optimizer install failed — retry manually: pi install npm:@xynogen/pix-optimizer"
 
-echo "--- GSD skill ---"
-if [ ! -d ~/.claude/get-shit-done ]; then
-  npx get-shit-done-cc 2>/dev/null || echo "GSD install failed — run 'npx get-shit-done-cc' manually"
+echo "--- Optimizer config (caveman + ponytail enabled) ---"
+# Persisted state read by pix-optimizer on session start.
+# Levels match macbook defaults; adjust via /optimizer overlay in pi.
+mkdir -p ~/.pi/agent
+if [ ! -f ~/.pi/agent/optimizer.json ]; then
+  cat > ~/.pi/agent/optimizer.json << 'OPT'
+{
+  "caveman": "ultra",
+  "rtk": "on",
+  "toon": "on",
+  "ponytail": "lite"
+}
+OPT
+  echo "optimizer.json: caveman=ultra ponytail=lite rtk=on toon=on"
 else
-  echo "GSD: already installed"
+  echo "optimizer.json: exists, not overwriting"
 fi
 
 echo "--- Session sync ---"
