@@ -1,19 +1,30 @@
 #!/bin/bash
-# Syncs Claude Code sessions + gstack data to a private git repo.
-# Each machine pushes to its own branch — no clone needed, no cross-contamination.
-# Runs via cron/pm2. Pushes new/changed files every 4 hours.
+# Syncs coding-agent sessions (Claude Code, Codex, Pi) + gstack legacy tree
+# to a private git repo. Each machine pushes to its own branch — no clone
+# needed, no cross-contamination. Runs via launchd every 4 hours.
 #
 # First run auto-initializes a local repo with the remote.
-# No git pull, no full clone — push-only.
+# Push-only; no git pull.
+#
+# Sources synced (all skipped if missing → won't cause deletions):
+#   ~/.claude/projects       → claude-sessions/   (jsonl + md only)
+#   ~/.codex/sessions        → codex/sessions/    (jsonl)
+#   ~/.codex/archived_sessions → codex/archived_sessions/ (jsonl)
+#   ~/.pi/agent/sessions     → pi/sessions/       (jsonl)
+#   ~/.gstack                → gstack/            (legacy — only if dir exists)
 
 set -euo pipefail
 
-SESSIONS_DIR="$HOME/.claude/projects"
-GSTACK_DIR="$HOME/.gstack"
 REPO_DIR="$HOME/claude-sessions"
 REMOTE="git@github.com:qwadratic/claude-sessions.git"
 VM_NAME=${SYNC_HOSTNAME:-$(hostname -s 2>/dev/null || hostname 2>/dev/null || echo "unknown")}
 BRANCH="sessions/${VM_NAME}"
+
+CLAUDE_SESSIONS_DIR="$HOME/.claude/projects"
+CODEX_SESSIONS_DIR="$HOME/.codex/sessions"
+CODEX_ARCHIVED_DIR="$HOME/.codex/archived_sessions"
+PI_SESSIONS_DIR="$HOME/.pi/agent/sessions"
+GSTACK_DIR="$HOME/.gstack"
 
 # Auto-initialize on first run (no clone needed)
 if [ ! -d "$REPO_DIR/.git" ]; then
@@ -25,21 +36,39 @@ if [ ! -d "$REPO_DIR/.git" ]; then
   git checkout -b "$BRANCH"
 else
   cd "$REPO_DIR"
-  # Ensure we're on the right branch
   CURRENT=$(git branch --show-current 2>/dev/null || echo "")
   if [ "$CURRENT" != "$BRANCH" ]; then
     git checkout -B "$BRANCH" 2>/dev/null
   fi
 fi
 
-# Sync Claude Code sessions (.jsonl + memory .md files)
-if [ -d "$SESSIONS_DIR" ]; then
+# --- Claude Code sessions (.jsonl + memory .md files) ---
+if [ -d "$CLAUDE_SESSIONS_DIR" ]; then
   mkdir -p "$REPO_DIR/claude-sessions"
   rsync -a --include='*/' --include='*.jsonl' --include='*.md' --exclude='*' \
-    "$SESSIONS_DIR/" "$REPO_DIR/claude-sessions/"
+    "$CLAUDE_SESSIONS_DIR/" "$REPO_DIR/claude-sessions/"
 fi
 
-# Sync gstack data (projects, analytics, config — skip browser profiles)
+# --- Codex sessions (.jsonl) ---
+if [ -d "$CODEX_SESSIONS_DIR" ]; then
+  mkdir -p "$REPO_DIR/codex/sessions"
+  rsync -a --include='*/' --include='*.jsonl' --exclude='*' \
+    "$CODEX_SESSIONS_DIR/" "$REPO_DIR/codex/sessions/"
+fi
+if [ -d "$CODEX_ARCHIVED_DIR" ]; then
+  mkdir -p "$REPO_DIR/codex/archived_sessions"
+  rsync -a --include='*/' --include='*.jsonl' --exclude='*' \
+    "$CODEX_ARCHIVED_DIR/" "$REPO_DIR/codex/archived_sessions/"
+fi
+
+# --- Pi coding-agent sessions (.jsonl) ---
+if [ -d "$PI_SESSIONS_DIR" ]; then
+  mkdir -p "$REPO_DIR/pi/sessions"
+  rsync -a --include='*/' --include='*.jsonl' --exclude='*' \
+    "$PI_SESSIONS_DIR/" "$REPO_DIR/pi/sessions/"
+fi
+
+# --- gstack legacy tree (only synced if ~/.gstack still exists) ---
 if [ -d "$GSTACK_DIR" ]; then
   mkdir -p "$REPO_DIR/gstack"
   rsync -a \
@@ -56,7 +85,6 @@ if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; the
   exit 0
 fi
 
-# Count new/changed files
 CHANGED=$(git status --porcelain | wc -l | tr -d ' ')
 
 git add -A
